@@ -6,8 +6,8 @@
 # @Brief: 简述报表功能
 import yaml
 import json
-from data_sync.core.data_plump import DataPlump
-from data_sync.core.transformation import Transformation
+from core.data_plump import DataPlump
+from core.transformation import Transformation
 
 
 def main():
