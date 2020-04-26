@@ -34,6 +34,7 @@ def main():
         .to_table("wdp.rpt_river_render_data_list",
                   ["data_time", "river_id", "indicator_code", "render_data", "insert_time", "is_deleted"]) \
         .upsert_by("data_time", "river_id", "indicator_code") \
+        .write_operation_time("update_time") \
         .commit(100) \
         .start()
 

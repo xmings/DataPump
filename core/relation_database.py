@@ -56,9 +56,12 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         self._columns = []
         self._upsert_columns = []
         self._other_columns = []
+        self._operation_time_column = ""
 
     def upsert_by(self, *args):
         self._upsert_columns = args
+        if not self._columns:
+            raise Exception("the method to_table() must be before upsert_by()")
         self._other_columns = list(filter(lambda x: x not in self._upsert_columns, self._columns))
         return self
 
@@ -66,10 +69,12 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         self.table_name = table_name
         assert column_names
         self._columns = column_names
-        self.sql = f"""
-            insert into {table_name} ({",".join(column_names)})  
-            values ({",".join(["%s"]*len(column_names))})
-        """
+        return self
+
+    def write_operation_time(self, column_name):
+        if not self._upsert_columns:
+            raise Exception("the method write_update_time() must be used with upsert_by()")
+        self._operation_time_column = column_name
         return self
 
     def commit(self, batch_size:int):
@@ -78,10 +83,16 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
 
     def write(self, df: _DataFrame):
         assert len(self._upsert_columns) + len(self._other_columns) == len(df.columns)
+        self.sql = f"""
+            insert into {self.table_name} ({",".join(self._columns)})  
+            values ({",".join(["%s"] * len(self._columns))})
+        """
+
         if self.db_type == "postgresql" and self._upsert_columns:
             self.sql += f"""
                 on conflict ({",".join(self._upsert_columns)})
                 do update set { ",".join([ i + "=EXCLUDED." + i for i in self._other_columns])}
+                {", " +self._operation_time_column + "=now()" if self._operation_time_column else ""}
             """
 
         with self.db_conn.cursor() as cursor:
