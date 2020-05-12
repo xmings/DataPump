@@ -15,9 +15,10 @@ class RelationDatabase:
 
     def connect(self, db_type: str, config: dict):
         self.db_type = db_type
-        if db_type == "postgresql":
+        if db_type in ("postgresql", "greenplumn"):
             from psycopg2 import connect
             self.db_conn = connect(**config)
+            self.db_conn.set_session(autocommit=False)
 
         return self
 
@@ -54,27 +55,35 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         self.sql = ""
         self._batch_size = 100
         self._columns = []
-        self._upsert_columns = []
-        self._other_columns = []
+        self._upsert_by_columns = []
+        self._upsert_conflict_update_columns = []
         self._operation_time_column = ""
+        self._is_truncate = False
+
 
     def upsert_by(self, *args):
-        self._upsert_columns = args
-        if not self._columns:
-            raise Exception("the method to_table() must be before upsert_by()")
-        self._other_columns = list(filter(lambda x: x not in self._upsert_columns, self._columns))
+        self._upsert_by_columns = args
         return self
 
-    def to_table(self, table_name: str, column_names: list):
+    def truncate(self):
+        if not self.table_name:
+            raise Exception("Method truncate() must be called after method to_table()")
+        self._is_truncate = True
+
+    def conflict_action(self, update_columns: list=(), **kwargs):
+        if not self._upsert_by_columns:
+            raise Exception("Method on_conflict() must be called after method upsert_by()")
+
+        for col in update_columns:
+            self._upsert_conflict_update_columns.append((col, None))
+
+        for k, v in kwargs.items():
+            self._upsert_conflict_update_columns.append((k, v))
+        return self
+
+    def to_table(self, table_name: str, column_names: list=()):
         self.table_name = table_name
-        assert column_names
         self._columns = column_names
-        return self
-
-    def write_operation_time(self, column_name):
-        if not self._upsert_columns:
-            raise Exception("the method write_update_time() must be used with upsert_by()")
-        self._operation_time_column = column_name
         return self
 
     def commit(self, batch_size:int):
@@ -82,23 +91,49 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         return self
 
     def write(self, df: _DataFrame):
-        assert len(self._upsert_columns) + len(self._other_columns) == len(df.columns)
-        self.sql = f"""
-            insert into {self.table_name} ({",".join(self._columns)})  
-            values ({",".join(["%s"] * len(self._columns))})
-        """
+        if len(self._columns) == 0:
+            self._columns = df.columns
 
-        if self.db_type == "postgresql" and self._upsert_columns:
-            self.sql += f"""
-                on conflict ({",".join(self._upsert_columns)})
-                do update set { ",".join([ i + "=EXCLUDED." + i for i in self._other_columns])}
-                {", " +self._operation_time_column + "=now()" if self._operation_time_column else ""}
-            """
+        self.sql = f"INSERT INTO {self.table_name} ({','.join(self._columns)}) "\
+                   f"VALUES ({','.join(['%s'] * len(self._columns))}) "
+        print(df.rows)
+
+        if self._upsert_by_columns:
+            if self.db_type.lower() == "postgresql":
+                self.sql += f"ON CONFLICT ({','.join(self._upsert_by_columns)}) "
+
+                if self._upsert_conflict_update_columns:
+                    self.sql += "DO UPDATE SET "
+                    for k, v in self._upsert_conflict_update_columns:
+                        self.sql += f"""{k}={'EXCLUDED.' + k if v is None else v if isinstance(v, (int, float)) else "'"+ v + "'"}, """
+                    else:
+                        self.sql = self.sql.strip().strip(",")
+                else:
+                    self.sql += "DO NOTHING"
+            elif self.db_type.lower() == "greenplumn":
+                delete_sql = f"DELETE FROM {self.table_name} WHERE 1=1 "
+                for col in self._upsert_by_columns:
+                    delete_sql += f"AND {col}=%s"
+
+                with self.db_conn.cursor() as cursor:
+                    for index, row in enumerate(df):
+                        # print(cursor.mogrify(delete_sql, list(map(lambda x: row[self._columns.index(x)], self._upsert_by_columns))).decode("utf8"))
+                        cursor.execute(delete_sql, list(map(lambda x: row[self._columns.index(x)], self._upsert_by_columns)))
+                        if index % 20 == 0 and index>0:
+                            self.db_conn.commit()
+                            return
+                    self.db_conn.commit()
+        else:
+            if self._is_truncate:
+                with self.db_conn.cursor() as cursor:
+                    cursor.execute(f"TRUNCATE TABLE {self.table_name}")
+
 
         with self.db_conn.cursor() as cursor:
+            self.db_conn.set_session(autocommit=False)
             batch_size = 0
             for i in df:
-
+                # print(cursor.mogrify(self.sql, i).decode("utf8"))
                 cursor.execute(self.sql, i)
                 batch_size += 1
 

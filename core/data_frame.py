@@ -14,5 +14,9 @@ class _DataFrame:
     def columns(self):
         return self._columns
 
+    @property
+    def rows(self):
+        return len(self._values)
+
     def __getitem__(self, item):
         return self._values[item]
