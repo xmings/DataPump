@@ -14,9 +14,10 @@ class RelationDatabase:
         self.db_conn = None
 
     def connect(self, db_type: str, config: dict):
-        self.db_type = db_type
         if db_type in ("postgresql", "greenplumn"):
             from psycopg2 import connect
+
+            self.db_type = db_type
             self.db_conn = connect(**config)
             self.db_conn.set_session(autocommit=False)
 
@@ -48,6 +49,7 @@ class RelationDatabaseReader(RelationDatabase, DataReader):
 
 
 class RelationDatabaseWriter(RelationDatabase, DataWriter):
+
     def __init__(self, dp):
         RelationDatabase.__init__(self)
         DataWriter.__init__(self, dp)
@@ -60,6 +62,16 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         self._operation_time_column = ""
         self._is_truncate = False
 
+    def connect(self, db_type: str, config: dict):
+        super().connect(db_type, config)
+        from .postgresql_database import PostgreSQLDatabaseWriter
+
+        writer = PostgreSQLDatabaseWriter(self)
+        writer.db_type = self.db_type
+        writer.db_conn = self.db_conn
+        wr, trans = self.dp.data_writers.popitem()
+        self.dp.data_writers[writer] = trans
+        return writer
 
     def upsert_by(self, *args):
         self._upsert_by_columns = args
@@ -69,6 +81,7 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         if not self.table_name:
             raise Exception("Method truncate() must be called after method to_table()")
         self._is_truncate = True
+        return self
 
     def conflict_action(self, update_columns: list=(), **kwargs):
         if not self._upsert_by_columns:
@@ -91,56 +104,7 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         return self
 
     def write(self, df: _DataFrame):
-        if len(self._columns) == 0:
-            self._columns = df.columns
-
-        self.sql = f"INSERT INTO {self.table_name} ({','.join(self._columns)}) "\
-                   f"VALUES ({','.join(['%s'] * len(self._columns))}) "
-        print(df.rows)
-
-        if self._upsert_by_columns:
-            if self.db_type.lower() == "postgresql":
-                self.sql += f"ON CONFLICT ({','.join(self._upsert_by_columns)}) "
-
-                if self._upsert_conflict_update_columns:
-                    self.sql += "DO UPDATE SET "
-                    for k, v in self._upsert_conflict_update_columns:
-                        self.sql += f"""{k}={'EXCLUDED.' + k if v is None else v if isinstance(v, (int, float)) else "'"+ v + "'"}, """
-                    else:
-                        self.sql = self.sql.strip().strip(",")
-                else:
-                    self.sql += "DO NOTHING"
-            elif self.db_type.lower() == "greenplumn":
-                delete_sql = f"DELETE FROM {self.table_name} WHERE 1=1 "
-                for col in self._upsert_by_columns:
-                    delete_sql += f"AND {col}=%s"
-
-                with self.db_conn.cursor() as cursor:
-                    for index, row in enumerate(df):
-                        # print(cursor.mogrify(delete_sql, list(map(lambda x: row[self._columns.index(x)], self._upsert_by_columns))).decode("utf8"))
-                        cursor.execute(delete_sql, list(map(lambda x: row[self._columns.index(x)], self._upsert_by_columns)))
-                        if index % 20 == 0 and index>0:
-                            self.db_conn.commit()
-                            return
-                    self.db_conn.commit()
-        else:
-            if self._is_truncate:
-                with self.db_conn.cursor() as cursor:
-                    cursor.execute(f"TRUNCATE TABLE {self.table_name}")
-
-
-        with self.db_conn.cursor() as cursor:
-            self.db_conn.set_session(autocommit=False)
-            batch_size = 0
-            for i in df:
-                # print(cursor.mogrify(self.sql, i).decode("utf8"))
-                cursor.execute(self.sql, i)
-                batch_size += 1
-
-                if batch_size == self._batch_size:
-                    self.db_conn.commit()
-                    batch_size = 0
-            self.db_conn.commit()
+        pass
 
 
 

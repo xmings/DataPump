@@ -5,6 +5,7 @@
 # @Date  : 2020/4/24
 # @Brief: 简述报表功能
 from threading import Thread
+from .data_writer import DataWriter
 from .transformation import Transformation
 from .relation_database import RelationDatabaseReader, RelationDatabaseWriter
 
