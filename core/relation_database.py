@@ -7,11 +7,13 @@
 from .data_reader import DataReader
 from .data_writer import DataWriter
 from .data_frame import _DataFrame
+from .utils import WriteMode
 
 class RelationDatabase:
     def __init__(self):
         self.db_type = None
         self.db_conn = None
+        self._conn_config = None
 
     def connect(self, db_type: str, config: dict):
         if db_type in ("postgresql", "greenplumn"):
@@ -61,6 +63,8 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         self._upsert_conflict_update_columns = []
         self._operation_time_column = ""
         self._is_truncate = False
+        self._mode = WriteMode.append
+        self._delimiter = '|'
 
     def connect(self, db_type: str, config: dict):
         super().connect(db_type, config)
@@ -74,7 +78,13 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         return writer
 
     def upsert_by(self, *args):
+        assert self._mode == WriteMode.upsert, "error write mode"
         self._upsert_by_columns = args
+        return self
+    
+    def write_mode(self, mode):
+        assert mode in WriteMode, f"unknown write mode: {mode}"
+        self._mode = mode
         return self
 
     def truncate(self):

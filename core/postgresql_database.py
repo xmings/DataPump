@@ -4,7 +4,11 @@
 # @Author: wangms
 # @Date  : 2020/5/13
 # @Brief: 简述报表功能
+import os
+import subprocess
+from functools import reduce
 from .data_frame import _DataFrame
+from .utils import WriteMode
 from .relation_database import RelationDatabaseWriter
 
 class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
@@ -18,7 +22,7 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                    f"VALUES ({','.join(['%s'] * len(self._columns))}) "
         print(f"The number of records that need to be synchronized: {df.rows}")
 
-        if self._upsert_by_columns:
+        if self._mode == WriteMode.upsert:
             if self.db_type.lower() == "postgresql":
                 self.sql += f"ON CONFLICT ({','.join(self._upsert_by_columns)}) "
 
@@ -56,19 +60,20 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                         batch_size = 0
                 self.db_conn.commit()
 
-        else:
-            if self._is_truncate:
-                print("truncate")
+        elif self._mode == WriteMode.overwrite or self._mode == WriteMode.append:
+            if self._mode == WriteMode.overwrite:
                 with self.db_conn.cursor() as cursor:
                     cursor.execute(f"TRUNCATE TABLE {self.table_name}")
 
-                    with open("temp_datafile.txt", "w", encoding="utf8") as f:
-                        for line in df:
-                            f.write("`".join(map(lambda x: "" if x is None else str(x), line)) + "\n")
+            fr, fw = os.pipe()
 
+            psql_command = "psql -d {dbname} -h {host} -p {port} -U {user} -c \"{cmd}\""\
+                .format(**self._conn_config, cmd=f"copy {self.table_name} from stdin")
 
-                    with open("temp_datafile.txt", "r", encoding="utf8") as f:
-                        cursor.copy_from(f, self.table_name,sep="`", columns=self._columns)
-                self.db_conn.commit()
+            subprocess.Popen(psql_command, stdin=fr, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+
+            with os.fdopen(fw, "w") as f:
+                for line in df:
+                    f.write(reduce(lambda x, y: f"{x}{self._delimiter}{y}", line))
 
 
