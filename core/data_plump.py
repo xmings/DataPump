@@ -4,17 +4,11 @@
 # @Author: wangms
 # @Date  : 2020/4/24
 # @Brief: 简述报表功能
-import logging
 from threading import Thread
 from .data_writer import DataWriter
 from .transformation import Transformation
 from .relation_database import RelationDatabaseReader, RelationDatabaseWriter
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(lineno)s - %(levelname)s - %(message)s",
-    datefmt='%Y-%m-%d %H:%M:%S.%f',
-)
 
 class DataPlump:
     def __init__(self):
