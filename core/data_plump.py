@@ -11,10 +11,11 @@ from .relation_database import RelationDatabaseReader, RelationDatabaseWriter
 
 
 class DataPlump:
-    def __init__(self):
+    def __init__(self, logger=None):
         self.data_reader = None
         self.data_writers = {}
         self._task = []
+        self.logger = logger
 
     @property
     def read(self):
@@ -37,7 +38,7 @@ class DataPlump:
 
     @property
     def from_rdb(self):
-        self.data_reader = RelationDatabaseReader(self)
+        self.data_reader = RelationDatabaseReader(self, self.logger)
         return self.data_reader
 
     @property
@@ -54,7 +55,7 @@ class DataPlump:
 
     @property
     def to_rdb(self)->RelationDatabaseWriter:
-        writer = RelationDatabaseWriter(self)
+        writer = RelationDatabaseWriter(self, self.logger)
         self.data_writers[writer] = self.transformation
         return writer
 

@@ -35,9 +35,9 @@ class RelationDatabase:
 
 
 class RelationDatabaseReader(RelationDatabase, DataReader):
-    def __init__(self, dp):
+    def __init__(self, dp, logger=None):
         RelationDatabase.__init__(self)
-        DataReader.__init__(self, dp)
+        DataReader.__init__(self, dp, logger)
         self.sql = None
 
     def from_sql(self, sql: str):
@@ -60,9 +60,9 @@ class RelationDatabaseReader(RelationDatabase, DataReader):
 
 class RelationDatabaseWriter(RelationDatabase, DataWriter):
 
-    def __init__(self, dp):
+    def __init__(self, dp, logger=None):
         RelationDatabase.__init__(self)
-        DataWriter.__init__(self, dp)
+        DataWriter.__init__(self, dp, logger)
         self.table_name = ""
         self.sql = ""
         self._batch_size = 100
@@ -78,7 +78,7 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         super().connect(db_type, host, port, user, password, db_name)
         from .postgresql_database import PostgreSQLDatabaseWriter
 
-        writer = PostgreSQLDatabaseWriter(self.dp)
+        writer = PostgreSQLDatabaseWriter(self.dp, self.logger)
         writer.db_type = self.db_type
         writer.db_conn = self.db_conn
         writer._conn_config = self._conn_config

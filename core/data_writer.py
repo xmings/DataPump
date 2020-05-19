@@ -6,9 +6,10 @@
 # @Brief: 简述报表功能
 
 class DataWriter:
-    def __init__(self, dp):
+    def __init__(self, dp, logger=None):
         self.dp = dp
         self.data_target = None
+        self.logger = logger
 
     def start(self):
         return self.dp.start()

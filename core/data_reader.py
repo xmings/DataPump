@@ -7,10 +7,11 @@
 from .transformation import Transformation
 
 class DataReader:
-    def __init__(self, dp):
+    def __init__(self, dp, logger=None):
         self.dp = dp
         self.dataframe = None
         self.data_source = None
+        self.logger = logger
 
     def get(self)->Transformation:
         return Transformation(self.dp, self.dataframe)

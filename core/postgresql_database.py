@@ -5,7 +5,6 @@
 # @Date  : 2020/5/13
 # @Brief: 简述报表功能
 import os
-import logging
 from traceback import format_exc
 import subprocess
 from functools import reduce
@@ -21,7 +20,8 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
         if len(self._columns) == 0:
             self._columns = df.columns
 
-        logging.debug(f"The number of records that need to be synchronized: {df.rows}")
+        if self.logger:
+            self.logger.info(f"The number of records that need to be synchronized: {df.rows}")
 
         if self._mode == WriteMode.upsert:
             if self.db_type.lower() == "postgresql":
@@ -64,15 +64,11 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                         try:
                             cursor.copy_from(os.fdopen(fr), temp_load_table, columns=self._columns, sep=self._delimiter,
                                              null="")
-                            cursor.execute(f"select count(1) from {temp_load_table}")
-                            logging.debug(f"copy: {cursor.fetchone()}")
 
                             conflict_data_table = f"tmp_conflict_data_{randint(1101, 1200)}"
                             cursor.execute(f"create temp table {conflict_data_table} as " \
                                            f"select a.* from {temp_load_table} a, {self.table_name} b " \
                                            f"where 1=1 {' '.join(['and a.' + col + '=' + 'b.' + col for col in self._upsert_by_columns])}")
-                            cursor.execute(f"select count(1) from {conflict_data_table}")
-                            logging.debug(f"conflict: {cursor.fetchone()}")
 
                             update_segment = []
                             for k, v in self._upsert_conflict_update_columns:
@@ -89,19 +85,17 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                                            f"from {conflict_data_table} b " \
                                            f"where 1=1 {' '.join(['and a.' + col + '=' + 'b.' + col for col in self._upsert_by_columns])}")
 
-                            logging.debug(f"update: {cursor.rowcount}")
-
                             cursor.execute(f"insert into {self.table_name} ({','.join(self._columns)}) " \
                                            f"select a.* "
                                            f"from {temp_load_table} a "
                                            f"left join {conflict_data_table} b "
                                            f"on 1=1 {' '.join(['and a.' + col + '=' + 'b.' + col for col in self._upsert_by_columns])} " \
                                            f"where b.{self._upsert_by_columns[0]} is null")
-                            logging.debug(f"insert: {cursor.rowcount}")
                             self.db_conn.commit()
                         except:
-                            logging.debug(format_exc())
-                            logging.debug(cursor.query)
+                            if self.logger:
+                                self.logger.error(format_exc())
+                                self.logger.error(f"sql: {cursor.query}")
                     else:
                         os.close(fr)
                         with os.fdopen(fw, "w") as f:
@@ -135,4 +129,5 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                     f.write(a + "\n")
 
             out, err = x.communicate()
-            logging.debug(f"out: {out}, error: {err}")
+            if self.logger:
+                self.logger.info(f"out: {out}, error: {err}")
