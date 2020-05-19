@@ -6,8 +6,8 @@
 # @Brief: 简述报表功能
 import os
 import logging
-import subprocess
 from traceback import format_exc
+import subprocess
 from functools import reduce
 from .data_frame import _DataFrame
 from .utils import WriteMode
@@ -106,7 +106,8 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                         os.close(fr)
                         with os.fdopen(fw, "w") as f:
                             for index, line in enumerate(df):
-                                f.write(reduce(lambda x, y: f"{x}{self._delimiter}{'' if y is None else y}", line).strip() + "\n")
+                                f.write(reduce(lambda x, y: f"{x}{self._delimiter}{'' if y is None else y}",
+                                               line).strip() + "\n")
 
         elif self._mode == WriteMode.overwrite or self._mode == WriteMode.append:
             if self._mode == WriteMode.overwrite:
@@ -120,7 +121,8 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
             psql_command = "psql -d {dbname} -h {host} -p {port} -U {user} -c \"{cmd}\"" \
                 .format(
                 cmd=f"copy {self.table_name} ({reduce(lambda x, y: f'{x},{y}', self._columns)}) from stdin delimiter '|' NULL ''",
-                **self._conn_config)
+                **self._conn_config
+            )
 
             x = subprocess.Popen(psql_command,
                                  stdout=subprocess.PIPE,
@@ -133,7 +135,4 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                     f.write(a + "\n")
 
             out, err = x.communicate()
-            logging.debug({
-                "out": out,
-                "err": err
-            })
+            logging.debug(f"out: {out}, error: {err}")
