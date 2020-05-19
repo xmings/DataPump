@@ -7,18 +7,28 @@
 from .data_reader import DataReader
 from .data_writer import DataWriter
 from .data_frame import _DataFrame
+from .utils import WriteMode
 
 class RelationDatabase:
     def __init__(self):
         self.db_type = None
         self.db_conn = None
+        self._conn_config = None
 
-    def connect(self, db_type: str, config: dict):
+    def connect(self, db_type: str, host: str, port: str, user: str, password: str, db_name: str=None):
         if db_type in ("postgresql", "greenplumn"):
+            self._conn_config = {
+                "host": host,
+                "port": port,
+                "dbname": db_name,
+                "user": user,
+                "password": password
+            }
+
             from psycopg2 import connect
 
             self.db_type = db_type
-            self.db_conn = connect(**config)
+            self.db_conn = connect(**self._conn_config)
             self.db_conn.set_session(autocommit=False)
 
         return self
@@ -61,26 +71,29 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         self._upsert_conflict_update_columns = []
         self._operation_time_column = ""
         self._is_truncate = False
+        self._mode = WriteMode.append
+        self._delimiter = '|'
 
-    def connect(self, db_type: str, config: dict):
-        super().connect(db_type, config)
+    def connect(self, db_type: str, host: str, port: str, user: str, password: str, db_name: str=None):
+        super().connect(db_type, host, port, user, password, db_name)
         from .postgresql_database import PostgreSQLDatabaseWriter
 
-        writer = PostgreSQLDatabaseWriter(self)
+        writer = PostgreSQLDatabaseWriter(self.dp)
         writer.db_type = self.db_type
         writer.db_conn = self.db_conn
+        writer._conn_config = self._conn_config
         wr, trans = self.dp.data_writers.popitem()
         self.dp.data_writers[writer] = trans
         return writer
 
     def upsert_by(self, *args):
+        assert self._mode == WriteMode.upsert, "error write mode"
         self._upsert_by_columns = args
         return self
-
-    def truncate(self):
-        if not self.table_name:
-            raise Exception("Method truncate() must be called after method to_table()")
-        self._is_truncate = True
+    
+    def write_mode(self, mode):
+        assert mode in WriteMode, f"unknown write mode: {mode}"
+        self._mode = mode
         return self
 
     def conflict_action(self, update_columns: list=(), **kwargs):

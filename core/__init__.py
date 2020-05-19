@@ -7,5 +7,6 @@
 from .data_plump import DataPlump
 from .transformation import Transformation
 from .data_frame import _DataFrame
+from .utils import WriteMode
 
-__all__ = ["DataPlump", "Transformation", "_DataFrame"]
+__all__ = ["DataPlump", "Transformation", "_DataFrame", "WriteMode"]
