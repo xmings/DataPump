@@ -5,6 +5,7 @@
 # @Date  : 2020/5/13
 # @Brief: 简述报表功能
 import os
+import json
 from traceback import format_exc
 import subprocess
 from functools import reduce
@@ -77,8 +78,12 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                                 else:
                                     if isinstance(v, (int, float)):
                                         update_segment.append(f'{k}={v}')
+                                    elif isinstance(v, (list, tuple, set)):
+                                        update_segment.append(k + "='{" + ','.join([str(i) for i in v]) + "}'::text[]")
+                                    elif isinstance(v, dict):
+                                        update_segment.append(f"{k}='{json.dumps(v)}'")
                                     else:
-                                        update_segment.append(f"{k}='{v}'")
+                                        update_segment.append(f"{k}='{str(v)}'")
 
                             cursor.execute(f"update {self.table_name} a " \
                                            f"set {','.join(update_segment)} " \
@@ -94,8 +99,9 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                             self.db_conn.commit()
                         except:
                             if self.logger:
-                                self.logger.error(format_exc())
                                 self.logger.error(f"sql: {cursor.query}")
+                                self.logger.error(format_exc())
+
                     else:
                         os.close(fr)
                         with os.fdopen(fw, "w") as f:
