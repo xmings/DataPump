@@ -82,8 +82,6 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                                 else:
                                     update_segment.append(f"{k}={self._simple_covert_column_value(v)}")
 
-                            print(update_segment)
-
                             cursor.execute(f"update {self.table_name} a " \
                                            f"set {','.join(update_segment)} " \
                                            f"from {conflict_data_table} b " \
