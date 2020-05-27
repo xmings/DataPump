@@ -78,9 +78,11 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                             for k, v in self._get_conflict_udpate_column().items():
                                 if isinstance(v, SameAsExclude):
                                     target_column = df.columns[self._columns.index(k)]
-                                    update_segment.append(f'{k}=a.{target_column}')
+                                    update_segment.append(f'{k}=b.{target_column}')
                                 else:
                                     update_segment.append(f"{k}={self._simple_covert_column_value(v)}")
+
+                            print(update_segment)
 
                             cursor.execute(f"update {self.table_name} a " \
                                            f"set {','.join(update_segment)} " \
