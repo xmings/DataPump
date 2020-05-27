@@ -10,13 +10,12 @@ from traceback import format_exc
 import subprocess
 from functools import reduce
 from .data_frame import _DataFrame
-from .utils import WriteMode
+from .utils import WriteMode, SameAsExclude
 from .relation_database import RelationDatabaseWriter
 from random import randint
 
 
 class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
-
     def write(self, df: _DataFrame):
         if len(self._columns) == 0:
             self._columns = df.columns
@@ -31,14 +30,18 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
 
                 self.sql += f"ON CONFLICT ({','.join(self._upsert_by_columns)}) "
 
-                if self._upsert_conflict_update_columns:
-                    self.sql += "DO UPDATE SET "
-                    for k, v in self._upsert_conflict_update_columns:
-                        self.sql += f"""{k}={'EXCLUDED.' + k if v is None else v if isinstance(v, (int, float)) else "'" + v + "'"}, """
+                update_segment = []
+                for k, v in self._get_conflict_udpate_column().items():
+                    if isinstance(v, SameAsExclude):
+                        target_column = df.columns[self._columns.index(k)]
+                        update_segment.append(f"{k} = EXCLUDED.{target_column}")
                     else:
-                        self.sql = self.sql.strip().strip(",")
+                        update_segment.append(f"{k} = {self._simple_covert_column_value(v)}")
+
+                if update_segment:
+                    self.sql += f"DO UPDATE SET {','.join(update_segment)}"
                 else:
-                    self.sql += "DO NOTHING"
+                    self.sql += f"DO NOTHING "
 
                 with self.db_conn.cursor() as cursor:
                     self.db_conn.set_session(autocommit=False)
@@ -72,18 +75,12 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                                            f"where 1=1 {' '.join(['and a.' + col + '=' + 'b.' + col for col in self._upsert_by_columns])}")
 
                             update_segment = []
-                            for k, v in self._upsert_conflict_update_columns:
-                                if v is None:
-                                    update_segment.append(f'{k}=a.{k}')
+                            for k, v in self._get_conflict_udpate_column().items():
+                                if isinstance(v, SameAsExclude):
+                                    target_column = df.columns[self._columns.index(k)]
+                                    update_segment.append(f'{k}=a.{target_column}')
                                 else:
-                                    if isinstance(v, (int, float)):
-                                        update_segment.append(f'{k}={v}')
-                                    elif isinstance(v, (list, tuple, set)):
-                                        update_segment.append(k + "='{" + ','.join([str(i) for i in v]) + "}'::text[]")
-                                    elif isinstance(v, dict):
-                                        update_segment.append(f"{k}='{json.dumps(v)}'")
-                                    else:
-                                        update_segment.append(f"{k}='{str(v)}'")
+                                    update_segment.append(f"{k}={self._simple_covert_column_value(v)}")
 
                             cursor.execute(f"update {self.table_name} a " \
                                            f"set {','.join(update_segment)} " \

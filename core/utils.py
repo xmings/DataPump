@@ -18,3 +18,7 @@ class WriteMode(IntEnum):
     upsert = 3
     insert_not_exists = 4
     update_exists = 5
+
+class SameAsExclude:
+    pass
+
