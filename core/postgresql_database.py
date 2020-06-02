@@ -46,8 +46,8 @@ class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
                 with self.db_conn.cursor() as cursor:
                     self.db_conn.set_session(autocommit=False)
                     batch_size = 0
-                    for i in df:
-                        cursor.execute(self.sql, i)
+                    for row in df:
+                        cursor.execute(self.sql%tuple(self._simple_covert_column_value(i) for i in row))
                         batch_size += 1
 
                         if batch_size == self._batch_size:

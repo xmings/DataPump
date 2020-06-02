@@ -135,15 +135,18 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
 
         return update_columns
 
-    def _simple_covert_column_value(self, v):
+    def _simple_covert_column_value(self, v, level=0):
         if v is None:
             return "null"
         elif isinstance(v, (int, float)):
             return v
-        elif isinstance(v, dict):
-            return f"'{json.dumps(v)}'"
-        elif isinstance(v, (list, tuple, set)):
-            return "'{" + ','.join([str(i) for i in v]) + "}'::text[]"
+        elif isinstance(v, dict) and level == 0:
+            return f"'{json.dumps(v)}'::json"
+        elif isinstance(v, list) and all(map(lambda x: isinstance(x, dict), v)) and level == 0:
+            return f"'{json.dumps(v)}'::json"
+        elif isinstance(v, (list, tuple, set)) and level == 0:
+            level += 1
+            return "'{" + ','.join([self._simple_covert_column_value(i, level) for i in v]) + "}'::text[]"
         else:
             return "'" + str(v) + "'"
 
