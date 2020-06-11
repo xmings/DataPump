@@ -4,7 +4,7 @@
 # @Author: wangms
 # @Date  : 2020/4/24
 # @Brief: 简述报表功能
-from .transformation import Transformation
+from .data_frame import _DataFrame
 
 class DataReader:
     def __init__(self, dp, logger=None):
@@ -13,8 +13,8 @@ class DataReader:
         self.data_source = None
         self.logger = logger
 
-    def get(self)->Transformation:
-        return Transformation(self.dp, self.dataframe)
+    def get(self)->_DataFrame:
+        return self.dataframe
 
 
 

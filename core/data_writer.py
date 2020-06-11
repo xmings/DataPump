@@ -12,4 +12,7 @@ class DataWriter:
         self.logger = logger
 
     def start(self):
-        return self.dp.start()
+        self.write()
+
+    def write(self):
+        pass

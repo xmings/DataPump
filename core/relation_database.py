@@ -8,16 +8,17 @@ import json
 from .data_reader import DataReader
 from .data_writer import DataWriter
 from .data_frame import _DataFrame
+from traceback import format_exc
 from .utils import WriteMode, SameAsExclude
 
 class RelationDatabase:
-    def __init__(self):
-        self.db_type = None
+    def __init__(self, db_type):
+        self.db_type = db_type
         self.db_conn = None
         self._conn_config = None
 
-    def connect(self, db_type: str, host: str, port: str, user: str, password: str, db_name: str=None):
-        if db_type in ("postgresql", "greenplumn"):
+    def connect(self, host: str, port: str, user: str, password: str, db_name: str=None):
+        if self.db_type in ("postgresql", "greenplumn"):
             self._conn_config = {
                 "host": host,
                 "port": port,
@@ -28,16 +29,19 @@ class RelationDatabase:
 
             from psycopg2 import connect
 
-            self.db_type = db_type
             self.db_conn = connect(**self._conn_config)
             self.db_conn.set_session(autocommit=False)
 
         return self
 
+    def commit(self, batch_size:int):
+        self._batch_size = batch_size
+        return self
+
 
 class RelationDatabaseReader(RelationDatabase, DataReader):
-    def __init__(self, dp, logger=None):
-        RelationDatabase.__init__(self)
+    def __init__(self, dp, db_type, logger=None):
+        RelationDatabase.__init__(self, db_type)
         DataReader.__init__(self, dp, logger)
         self.sql = None
 
@@ -56,13 +60,13 @@ class RelationDatabaseReader(RelationDatabase, DataReader):
                 columns=list(map(lambda x:x.name, cursor.description)),
                 values=cursor.fetchall()
             )
-            return super().get()
+        self.db_conn.close()
+        return super().get()
 
 
 class RelationDatabaseWriter(RelationDatabase, DataWriter):
-
-    def __init__(self, dp, logger=None):
-        RelationDatabase.__init__(self)
+    def __init__(self, dp, db_type, logger=None):
+        RelationDatabase.__init__(self, db_type)
         DataWriter.__init__(self, dp, logger)
         self.table_name = ""
         self.sql = ""
@@ -74,18 +78,14 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         self._conflict_exclude_update_columns = []
         self._mode = WriteMode.append
         self._delimiter = '|'
+        self._data = None
 
-    def connect(self, db_type: str, host: str, port: str, user: str, password: str, db_name: str=None):
-        super().connect(db_type, host, port, user, password, db_name)
-        from .postgresql_database import PostgreSQLDatabaseWriter
+    def _set_data(self, data):
+        self._data = data
 
-        writer = PostgreSQLDatabaseWriter(self.dp, self.logger)
-        writer.db_type = self.db_type
-        writer.db_conn = self.db_conn
-        writer._conn_config = self._conn_config
-        wr, trans = self.dp.data_writers.popitem()
-        self.dp.data_writers[writer] = trans
-        return writer
+    def connect(self, host: str, port: str, user: str, password: str, db_name: str=None):
+        super().connect(host, port, user, password, db_name)
+        return self
 
     def upsert_by(self, *args):
         assert self._mode == WriteMode.upsert, "error write mode"
@@ -155,12 +155,14 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
         self._columns = column_names
         return self
 
-    def commit(self, batch_size:int):
-        self._batch_size = batch_size
-        return self
-
-    def write(self, df: _DataFrame):
-        pass
+    def start(self):
+        try:
+            self.write()
+            self.db_conn.close()
+        except:
+            self.logger.error(f"Failed in writing data: "
+                              f"<target-table: {self.table_name,}, write-mode: {self._mode.name}>. \n"
+                              f"\n {format_exc()}")
 
 
 
