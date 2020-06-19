@@ -1,6 +1,6 @@
 #!/bin/python
 # -*- coding: utf-8 -*-
-# @File  : greenplumn_database.py
+# @File  : greenplum_database.py
 # @Author: wangms
 # @Date  : 2020/6/11
 # @Brief: 简述报表功能
@@ -14,8 +14,8 @@ from .relation_database import RelationDatabaseWriter
 from random import randint
 
 
-class GreenplumnDatabaseWriter(RelationDatabaseWriter):
-    def write(self):
+class GreenplumDatabaseWriter(RelationDatabaseWriter):
+    def _write(self):
         if len(self._columns) == 0:
             self._columns = self._data.columns
 
@@ -43,11 +43,13 @@ class GreenplumnDatabaseWriter(RelationDatabaseWriter):
                             else:
                                 update_segment.append(f"{k}={self._simple_covert_column_value(v)}")
 
-                        cursor.execute(f"update {self.table_name} a " \
-                                       f"set {','.join(update_segment)} " \
-                                       f"from {conflict_data_table} b " \
-                                       f"where 1=1 {' '.join(['and a.' + col + '=' + 'b.' + col for col in self._upsert_by_columns])}")
-                        update_row_number = cursor.rowcount
+                        update_row_number = 0
+                        if update_segment:
+                            cursor.execute(f"update {self.table_name} a " \
+                                           f"set {','.join(update_segment)} " \
+                                           f"from {conflict_data_table} b " \
+                                           f"where 1=1 {' '.join(['and a.' + col + '=' + 'b.' + col for col in self._upsert_by_columns])}")
+                            update_row_number = cursor.rowcount
 
                         cursor.execute(f"insert into {self.table_name} ({','.join(self._columns)}) " \
                                        f"select a.* "

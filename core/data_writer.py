@@ -4,15 +4,25 @@
 # @Author: wangms
 # @Date  : 2020/4/24
 # @Brief: 简述报表功能
+from threading import Thread
 
 class DataWriter:
-    def __init__(self, dp, logger=None):
-        self.dp = dp
+    def __init__(self, enable_thread, logger=None):
         self.data_target = None
         self.logger = logger
+        self.enable_thread = enable_thread
 
     def start(self):
-        self.write()
+        if self.enable_thread:
+            self.thread = Thread(target=self._write)
+            self.thread.daemon = True
+            self.thread.start()
+        else:
+            self._write()
 
-    def write(self):
+    def _write(self):
         pass
+
+    def wait(self):
+        if self.enable_thread and self.thread.is_alive():
+            self.thread.join()

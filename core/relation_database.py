@@ -18,7 +18,7 @@ class RelationDatabase:
         self._conn_config = None
 
     def connect(self, host: str, port: str, user: str, password: str, db_name: str=None):
-        if self.db_type in ("postgresql", "greenplumn"):
+        if self.db_type in ("postgresql", "greenplum"):
             self._conn_config = {
                 "host": host,
                 "port": port,
@@ -40,9 +40,9 @@ class RelationDatabase:
 
 
 class RelationDatabaseReader(RelationDatabase, DataReader):
-    def __init__(self, dp, db_type, logger=None):
+    def __init__(self, db_type, logger=None, enable_thread=False):
         RelationDatabase.__init__(self, db_type)
-        DataReader.__init__(self, dp, logger)
+        DataReader.__init__(self, logger, enable_thread)
         self.sql = None
 
     def from_sql(self, sql: str):
@@ -53,7 +53,7 @@ class RelationDatabaseReader(RelationDatabase, DataReader):
         self.sql = f"select * from {table_name}"
         return self
 
-    def get(self):
+    def _read(self):
         with self.db_conn.cursor() as cursor:
             cursor.execute(self.sql)
             self.dataframe = _DataFrame(
@@ -61,13 +61,12 @@ class RelationDatabaseReader(RelationDatabase, DataReader):
                 values=cursor.fetchall()
             )
         self.db_conn.close()
-        return super().get()
 
 
 class RelationDatabaseWriter(RelationDatabase, DataWriter):
-    def __init__(self, dp, db_type, logger=None):
+    def __init__(self, db_type, logger=None, enable_thread=False):
         RelationDatabase.__init__(self, db_type)
-        DataWriter.__init__(self, dp, logger)
+        DataWriter.__init__(self, logger, enable_thread)
         self.table_name = ""
         self.sql = ""
         self._batch_size = 100
@@ -157,8 +156,9 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
 
     def start(self):
         try:
-            self.write()
-            self.db_conn.close()
+            if self._mode == WriteMode.upsert and not self._upsert_by_columns:
+                raise Exception("upsert columns Must be specified while using upsert mode")
+            super().start()
         except:
             self.logger.error(f"Failed in writing data: "
                               f"<target-table: {self.table_name,}, write-mode: {self._mode.name}>. \n"

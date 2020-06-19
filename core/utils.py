@@ -113,6 +113,6 @@ class ConditionGroup(list):
         return str(self)
 
     def __str__(self):
-        return f"ConditionGroup{[i for i in self]}"
+        return "ConditionGroup{" + ", ".join([str(i) for i in self])+ "}"
 
 

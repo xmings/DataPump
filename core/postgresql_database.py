@@ -13,7 +13,7 @@ from .relation_database import RelationDatabaseWriter
 
 
 class PostgreSQLDatabaseWriter(RelationDatabaseWriter):
-    def write(self):
+    def _write(self):
         if len(self._columns) == 0:
             self._columns = self._data.columns
 

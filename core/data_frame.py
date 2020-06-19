@@ -7,6 +7,7 @@
 from .utils import Column, Condition, ConditionGroup
 from operator import attrgetter
 from collections import namedtuple
+from unidecode import unidecode
 
 
 class _DataFrame:
@@ -46,7 +47,7 @@ class _DataFrame:
     def join(self, others, join_type, condition_groups):
         if isinstance(condition_groups, Condition):
             condition_groups = (ConditionGroup(condition_groups),)
-        elif isinstance(condition_groups, list):
+        elif isinstance(condition_groups, ConditionGroup):
             condition_groups = (condition_groups,)
 
         new_column = self.columns + list(map(lambda x: f"{x}_r" if x in self.columns else x, others.columns))
@@ -86,10 +87,19 @@ class _DataFrame:
         return _DataFrame(columns, values)
 
     def sort(self, **columns):
-        # TODO: 中文排序功能待实现
         v = list(self._values)
+        def _sort_key(obj, attr):
+            val = getattr(obj, attr)
+            if hasattr(val, "encode"):
+                _val = ''
+                for i in val:
+                    if '\u4e00' <= i <= '\u9fff':
+                        _val += unidecode(i).strip()
+                return _val
+            return val
+
         for col, direction in reversed(list(columns.items())):
-            v.sort(key=attrgetter(col),
+            v.sort(key=lambda x: _sort_key(x, col),
                    reverse=False if direction.lower() == "asc" else True)
         return _DataFrame(self.columns, v)
 
