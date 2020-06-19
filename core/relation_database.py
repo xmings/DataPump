@@ -82,6 +82,9 @@ class RelationDatabaseWriter(RelationDatabase, DataWriter):
     def _set_data(self, data):
         self._data = data
 
+    def set_delimiter(self, delimiter):
+        self._delimiter = delimiter
+
     def connect(self, host: str, port: str, user: str, password: str, db_name: str=None):
         super().connect(host, port, user, password, db_name)
         return self
