@@ -66,7 +66,7 @@ class RelationDatabaseReader(RelationDatabase, DataReader):
 class RelationDatabaseWriter(RelationDatabase, DataWriter):
     def __init__(self, db_type, logger=None, enable_thread=False):
         RelationDatabase.__init__(self, db_type)
-        DataWriter.__init__(self, logger, enable_thread)
+        DataWriter.__init__(self, enable_thread, logger)
         self.table_name = ""
         self.sql = ""
         self._batch_size = 100

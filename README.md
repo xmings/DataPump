@@ -62,9 +62,9 @@ dp.write() \
     .with_data(data3_3) \
     .to_rdb(db_type="greenplum") \
     .connect(**target_db) \
-    .to_table("tmp.wms_dp_test") \
+    .to_table("tmp.tmp_weather") \
     .write_mode(WriteMode.upsert) \
-    .upsert_by("data_time", "site_id") \
+    .upsert_by("data_time", "area_code") \
     .conflict_action(
         update_others_columns=True,
         update_time=datetime.now().isoformat()
@@ -72,6 +72,8 @@ dp.write() \
     .start()
 ```
 输出:
+
 ![图片](output.png)
+
 
 
