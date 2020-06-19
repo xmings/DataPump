@@ -40,9 +40,9 @@ class RelationDatabase:
 
 
 class RelationDatabaseReader(RelationDatabase, DataReader):
-    def __init__(self, db_type, logger=None, enable_thread=False):
+    def __init__(self, db_type, enable_thread=False, logger=None):
         RelationDatabase.__init__(self, db_type)
-        DataReader.__init__(self, logger, enable_thread)
+        DataReader.__init__(self, enable_thread, logger)
         self.sql = None
 
     def from_sql(self, sql: str):
