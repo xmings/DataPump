@@ -1,5 +1,5 @@
 # DataPump
-DataPump is a data synchronization tool. 
+DataPump is a data synchronization tool. It keeps you away from creating database connection and writing graceless SQL code.
 
 ## Requirements
 - Python3.7+
@@ -9,8 +9,8 @@ DataPump is a data synchronization tool.
 - support join a dataframe with another dataframe by specified join condition.
 - support action as `map`, `filter`, `with_column`, `select`, `sort` etc.
 - support many sinks, for example console, file, database, ftp. Unfortunatly database and console sinks are avaliable so far.
-- support multi-thread.
-- support many write-mode, such as upsert, overwrite, append and so on.
+- support multi-thread while loading and writing data.
+- support many write modes, such as upsert, overwrite, append and so on.
 
 ## Code Example
 ```python
